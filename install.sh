@@ -16,25 +16,25 @@ place() {  # place <источник> <цель>
 }
 
 place "$SRC/CLAUDE.md" "$DST/CLAUDE.md"
-place "$SRC/hooks" "$DST/base-hooks"
+rm -rf "$DST/base-hooks"   # хуки graphify из прошлых версий базы больше не нужны
 for d in "$SRC"/skills/*/; do place "${d%/}" "$DST/skills/$(basename "$d")"; done
 for f in "$SRC"/agents/*.md; do place "$f" "$DST/agents/$(basename "$f")"; done
 
 # settings.json не заменяется, а сливается: Claude Code сам пишет в этот файл.
 command -v node >/dev/null || { echo "Нет node: перенеси settings.base.json в $DST/settings.json вручную"; exit 1; }
 [ -f "$DST/settings.json" ] && cp "$DST/settings.json" "$DST/settings.json.bak-$STAMP"
-BASE="$SRC/settings.base.json" OUT="$DST/settings.json" HOOKS="$DST/base-hooks" node -e '
-const fs = require("fs"), { BASE, OUT, HOOKS } = process.env;
-const base = JSON.parse(fs.readFileSync(BASE, "utf8").replaceAll("__HOOKS__", HOOKS));
+BASE="$SRC/settings.base.json" OUT="$DST/settings.json" node -e '
+const fs = require("fs"), { BASE, OUT } = process.env;
+const base = JSON.parse(fs.readFileSync(BASE, "utf8"));
 const cur = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, "utf8")) : {};
 cur.env = { ...base.env, ...cur.env };                       // личные значения важнее базовых
 cur.permissions = cur.permissions || {};
 cur.permissions.allow = [...new Set([...(cur.permissions.allow || []), ...base.permissions.allow])];
-cur.hooks = cur.hooks || {};
-for (const [ev, groups] of Object.entries(base.hooks)) {
-  const own = (cur.hooks[ev] || []).filter(g => !JSON.stringify(g).includes("base-hooks"));
-  cur.hooks[ev] = [...own, ...groups];                        // старые базовые хуки заменяются
+for (const ev of Object.keys(cur.hooks || {})) {             // убрать хуки прошлых версий базы
+  cur.hooks[ev] = cur.hooks[ev].filter(g => !JSON.stringify(g).includes("base-hooks"));
+  if (!cur.hooks[ev].length) delete cur.hooks[ev];
 }
+if (cur.hooks && !Object.keys(cur.hooks).length) delete cur.hooks;
 fs.writeFileSync(OUT, JSON.stringify(cur, null, 2) + "\n");
 '
 echo "Готово: $DST. Проверка — /context и /hooks в новой сессии Claude Code."
