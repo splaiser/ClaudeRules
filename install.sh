@@ -20,6 +20,15 @@ rm -rf "$DST/base-hooks"   # хуки graphify из прошлых версий 
 for d in "$SRC"/skills/*/; do place "${d%/}" "$DST/skills/$(basename "$d")"; done
 for f in "$SRC"/agents/*.md; do place "$f" "$DST/agents/$(basename "$f")"; done
 
+# Глобальные плагины. Повторная установка безопасна.
+PLUGINS=("context7@claude-plugins-official")
+if command -v claude >/dev/null; then
+  for p in "${PLUGINS[@]}"; do claude plugin install "$p" --scope user >/dev/null 2>&1 \
+    && echo "плагин: $p" || echo "не удалось поставить $p — в Claude Code: /plugin install $p"; done
+else
+  echo "claude не найден в PATH — поставь вручную в Claude Code: /plugin install ${PLUGINS[*]}"
+fi
+
 # settings.json не заменяется, а сливается: Claude Code сам пишет в этот файл.
 command -v node >/dev/null || { echo "Нет node: перенеси settings.base.json в $DST/settings.json вручную"; exit 1; }
 [ -f "$DST/settings.json" ] && cp "$DST/settings.json" "$DST/settings.json.bak-$STAMP"
