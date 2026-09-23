@@ -1,0 +1,28 @@
+{
+  "env": {
+    "BASH_MAX_OUTPUT_LENGTH": "15000"
+  },
+  "permissions": {
+    "allow": [
+      "Bash(graphify query*)",
+      "Bash(graphify path*)",
+      "Bash(graphify explain*)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [{ "type": "command", "command": "bash \"__HOOKS__/graph-mark.sh\"" }]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [{ "type": "command", "command": "bash \"__HOOKS__/graph-update.sh\"" }]
+      }
+    ]
+  }
+}
