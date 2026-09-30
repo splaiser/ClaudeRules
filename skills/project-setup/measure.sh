@@ -66,7 +66,7 @@ echo "engine: $engine"
 
 b() { command -v "$1" >/dev/null 2>&1 && echo yes || echo no; }
 py=no; { command -v python3 || command -v python; } >/dev/null 2>&1 && py=yes
-echo "bin: claude=$(b claude) node=$(b node) npm=$(b npm) python=$py" \
+echo "bin: claude=$(b claude) node=$(b node) npm=$(b npm) python=$py java=$(b java)" \
      "typescript-language-server=$(b typescript-language-server) pyright-langserver=$(b pyright-langserver)" \
      "gopls=$(b gopls) rust-analyzer=$(b rust-analyzer) csharp-ls=$(b csharp-ls)" \
      "intelephense=$(b intelephense) clangd=$(b clangd) jdtls=$(b jdtls)"

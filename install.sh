@@ -8,7 +8,8 @@ STAMP=$(date +%Y%m%d-%H%M%S)
 mkdir -p "$DST/skills" "$DST/agents"
 
 place() {  # place <источник> <цель>
-  if [ -e "$2" ] && [ ! -L "$2" ] && [ "${COPY:-0}" != 1 ]; then
+  # Бэкап, если на месте цели свой файл: в режиме COPY старая копия без правок не бэкапится.
+  if [ -e "$2" ] && [ ! -L "$2" ] && ! diff -rq "$1" "$2" >/dev/null 2>&1; then
     mv "$2" "$2.bak-$STAMP"; echo "бэкап: $2.bak-$STAMP"
   fi
   rm -rf "$2"
@@ -19,10 +20,17 @@ place "$SRC/CLAUDE.md" "$DST/CLAUDE.md"
 rm -rf "$DST/base-hooks"   # хуки graphify из прошлых версий базы больше не нужны
 for d in "$SRC"/skills/*/; do place "${d%/}" "$DST/skills/$(basename "$d")"; done
 for f in "$SRC"/agents/*.md; do place "$f" "$DST/agents/$(basename "$f")"; done
+for l in "$DST"/skills/* "$DST"/agents/*; do   # симлинки на удалённые из базы файлы
+  [ -L "$l" ] && [ ! -e "$l" ] && case "$(readlink "$l")" in
+    "$SRC"/*) rm "$l"; echo "удалён устаревший: $l" ;; esac
+done
 
 # Глобальные плагины. Повторная установка безопасна.
-PLUGINS=("context7@claude-plugins-official")
+# ponytail: на него ссылаются CLAUDE.md, reviewer и long-task.
+MARKETPLACES=("DietrichGebert/ponytail")
+PLUGINS=("context7@claude-plugins-official" "ponytail@ponytail")
 if command -v claude >/dev/null; then
+  for m in "${MARKETPLACES[@]}"; do claude plugin marketplace add "$m" >/dev/null 2>&1 || true; done
   for p in "${PLUGINS[@]}"; do claude plugin install "$p" --scope user >/dev/null 2>&1 \
     && echo "плагин: $p" || echo "не удалось поставить $p — в Claude Code: /plugin install $p"; done
 else
@@ -38,7 +46,8 @@ const base = JSON.parse(fs.readFileSync(BASE, "utf8"));
 const cur = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, "utf8")) : {};
 cur.env = { ...base.env, ...cur.env };                       // личные значения важнее базовых
 cur.permissions = cur.permissions || {};
-cur.permissions.allow = [...new Set([...(cur.permissions.allow || []), ...base.permissions.allow])];
+for (const k of ["allow", "deny"])
+  cur.permissions[k] = [...new Set([...(cur.permissions[k] || []), ...(base.permissions[k] || [])])];
 for (const ev of Object.keys(cur.hooks || {})) {             // убрать хуки прошлых версий базы
   cur.hooks[ev] = cur.hooks[ev].filter(g => !JSON.stringify(g).includes("base-hooks"));
   if (!cur.hooks[ev].length) delete cur.hooks[ev];

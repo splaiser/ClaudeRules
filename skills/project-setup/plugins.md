@@ -19,10 +19,19 @@
 | php | php-lsp | intelephense | `npm install -g intelephense` |
 | c | clangd-lsp | clangd | вручную (LLVM) |
 | java | jdtls-lsp | jdtls | вручную |
-| bsl, gd, sol | — | — | официального плагина нет, пропустить |
+| bsl, gd, sol | — | — | официального плагина нет, пропустить (для bsl — см. «1С») |
 
 Бинарника нет и нет npm/go/rustup/dotnet для установки → плагин не ставить,
 в итоге назвать, чего не хватает.
+
+## 1С (`bsl` ≥ 10) — команда в CLAUDE.md, не плагин
+
+Статанализ BSL Language Server как команда линта в `## Команды` проекта:
+`java -jar bsl-language-server.jar --analyze --srcDir <каталог исходников> --reporter console`
+(большая конфигурация — `java -Xmx4g -jar …`). Нужен `java=yes` и jar из релизов
+https://github.com/1c-syntax/bsl-language-server. Ничего не скачивать самому —
+дать ссылку; путь к jar пользователь указывает сам. Для отчёта субагенту
+`test-runner` удобнее `--reporter json --outputDir <каталог>`.
 
 ## security-guidance@claude-plugins-official
 

@@ -10,6 +10,20 @@
       "Bash(git status*)",
       "Bash(git diff*)",
       "Bash(git log*)"
+    ],
+    "deny": [
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(!.env.example)",
+      "Read(*.pem)",
+      "Read(*.key)",
+      "Read(id_rsa*)",
+      "Read(id_ed25519*)",
+      "Read(*.keystore)",
+      "Read(~/.ssh/**)",
+      "Read(~/.config/solana/**)",
+      "Read(~/.foundry/keystores/**)",
+      "Read(~/.ethereum/keystore/**)"
     ]
   }
 }
