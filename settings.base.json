@@ -9,12 +9,19 @@
       "Bash(graphify explain*)",
       "Bash(git status*)",
       "Bash(git diff*)",
-      "Bash(git log*)"
+      "Bash(git log*)",
+      "Bash(bash ~/.claude/skills/review/gate.sh*)",
+      "Bash(bash ~/.claude/skills/rules-review/lesson.sh*)"
     ],
-    "deny": [
+    "ask": [
       "Read(.env)",
       "Read(.env.*)",
       "Read(!.env.example)",
+      "Edit(.env)",
+      "Edit(.env.*)",
+      "Edit(!.env.example)"
+    ],
+    "deny": [
       "Read(*.pem)",
       "Read(*.key)",
       "Read(id_rsa*)",

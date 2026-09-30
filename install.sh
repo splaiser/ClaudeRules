@@ -40,14 +40,19 @@ fi
 # settings.json не заменяется, а сливается: Claude Code сам пишет в этот файл.
 command -v node >/dev/null || { echo "Нет node: перенеси settings.base.json в $DST/settings.json вручную"; exit 1; }
 [ -f "$DST/settings.json" ] && cp "$DST/settings.json" "$DST/settings.json.bak-$STAMP"
-BASE="$SRC/settings.base.json" OUT="$DST/settings.json" node -e '
-const fs = require("fs"), { BASE, OUT } = process.env;
-const base = JSON.parse(fs.readFileSync(BASE, "utf8"));
-const cur = fs.existsSync(OUT) ? JSON.parse(fs.readFileSync(OUT, "utf8")) : {};
+BASE="$SRC/settings.base.json" OUT="$DST/settings.json" MAN="$DST/claude-base.permissions.json" node -e '
+const fs = require("fs"), { BASE, OUT, MAN } = process.env;
+const read = f => fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : {};
+const base = read(BASE), cur = read(OUT), prev = read(MAN);  // prev — правила, добавленные базой в прошлый раз
 cur.env = { ...base.env, ...cur.env };                       // личные значения важнее базовых
 cur.permissions = cur.permissions || {};
-for (const k of ["allow", "deny"])
-  cur.permissions[k] = [...new Set([...(cur.permissions[k] || []), ...(base.permissions[k] || [])])];
+for (const k of ["allow", "ask", "deny"]) {
+  const now = base.permissions[k] || [];
+  const gone = new Set((prev[k] || []).filter(r => !now.includes(r)));  // убранные из базы — убрать и здесь
+  cur.permissions[k] = [...new Set([...(cur.permissions[k] || []).filter(r => !gone.has(r)), ...now])];
+  if (!cur.permissions[k].length) delete cur.permissions[k];
+}
+fs.writeFileSync(MAN, JSON.stringify(base.permissions, null, 2) + "\n");
 for (const ev of Object.keys(cur.hooks || {})) {             // убрать хуки прошлых версий базы
   cur.hooks[ev] = cur.hooks[ev].filter(g => !JSON.stringify(g).includes("base-hooks"));
   if (!cur.hooks[ev].length) delete cur.hooks[ev];
