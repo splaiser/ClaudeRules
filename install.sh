@@ -39,9 +39,11 @@ else
 fi
 
 # settings.json не заменяется, а сливается: Claude Code сам пишет в этот файл.
-command -v node >/dev/null || { echo "Нет node: перенеси settings.base.json в $DST/settings.json вручную"; exit 1; }
-[ -f "$DST/settings.json" ] && cp "$DST/settings.json" "$DST/settings.json.bak-$STAMP"
-BASE="$SRC/settings.base.json" OUT="$DST/settings.json" MAN="$DST/claude-base.permissions.json" node -e '
+# Слияние — node или python; без них, если settings.json ещё нет, кладётся готовый файл базы.
+export BASE="$SRC/settings.base.json" OUT="$DST/settings.json" MAN="$DST/claude-base.permissions.json"
+[ -f "$OUT" ] && cp "$OUT" "$OUT.bak-$STAMP"
+PY=""; for c in python3 python py; do "$c" -c "import json" >/dev/null 2>&1 && { PY=$c; break; }; done
+if command -v node >/dev/null; then node -e '
 const fs = require("fs"), { BASE, OUT, MAN } = process.env;
 const read = f => fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : {};
 const base = read(BASE), cur = read(OUT), prev = read(MAN);  // prev — правила, добавленные базой в прошлый раз
@@ -64,4 +66,37 @@ for (const [ev, groups] of Object.entries(base.hooks || {}))  // и постав
 if (cur.hooks && !Object.keys(cur.hooks).length) delete cur.hooks;
 fs.writeFileSync(OUT, JSON.stringify(cur, null, 2) + "\n");
 '
+elif [ -n "$PY" ]; then "$PY" -c '
+import json, os                                               # то же слияние, что в ветке node
+E = os.environ
+read = lambda f: json.load(open(f, encoding="utf-8")) if os.path.exists(f) else {}
+base, cur, prev = read(E["BASE"]), read(E["OUT"]), read(E["MAN"])
+cur["env"] = {**base.get("env", {}), **cur.get("env", {})}
+for k in ["autoCompactWindow"]:
+    if k in base and k not in cur: cur[k] = base[k]
+perms = cur.setdefault("permissions", {})
+for k in ["allow", "ask", "deny"]:
+    now = base.get("permissions", {}).get(k, [])
+    gone = {r for r in prev.get(k, []) if r not in now}
+    merged = list(dict.fromkeys([r for r in perms.get(k, []) if r not in gone] + now))
+    if merged: perms[k] = merged
+    else: perms.pop(k, None)
+json.dump(base.get("permissions", {}), open(E["MAN"], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+hooks = cur.get("hooks", {})
+for ev in list(hooks):
+    hooks[ev] = [g for g in hooks[ev] if "base-hooks" not in json.dumps(g, ensure_ascii=False)]
+    if not hooks[ev]: del hooks[ev]
+for ev, groups in base.get("hooks", {}).items():
+    hooks.setdefault(ev, []).extend(groups)
+if hooks: cur["hooks"] = hooks
+else: cur.pop("hooks", None)
+json.dump(cur, open(E["OUT"], "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+'
+elif [ ! -f "$OUT" ]; then
+  cp "$BASE" "$OUT"
+  sed -n '/"permissions"/,/^  }/p' "$BASE" | sed '1s/.*"permissions": //; $s/},*$/}/' > "$MAN"
+else
+  echo "Нет node и python: слить настройки базы с вашим $OUT не могу."
+  echo "Поставьте Node.js (winget install OpenJS.NodeJS.LTS) и запустите установку снова."; exit 1
+fi
 echo "Готово: $DST. Проверка — /context и /hooks в новой сессии Claude Code."

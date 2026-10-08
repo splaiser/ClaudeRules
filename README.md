@@ -7,7 +7,9 @@
     git clone <url> ~/claude-base
     bash ~/claude-base/install.sh          # Windows без Developer Mode: COPY=1 bash install.sh
 
-Обновление: `git pull && bash install.sh`. В режиме симлинков правки в репозитории
+Обновление с проверкой установки: `git pull && bash update.sh` (на Windows сам
+включает режим копий и ставит базу туда, куда смотрит Claude Code). Только установка:
+`git pull && bash install.sh`. В режиме симлинков правки в репозитории
 действуют сразу, установщик нужен только при добавлении новых файлов или хуков.
 
 ## Слои
