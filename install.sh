@@ -7,14 +7,33 @@ DST="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 STAMP=$(date +%Y%m%d-%H%M%S)
 mkdir -p "$DST/skills" "$DST/agents"
 
+BACKUPS="$DST/claude-base-backups/$STAMP"   # бэкапы — вне skills/ и agents/, чтобы не стать навыками
+INSTALLED="$DST/claude-base-installed.txt"  # отпечатки того, что установщик положил в прошлый раз
+touch "$INSTALLED"
+fp() {  # отпечаток файла или папки (относительные пути + содержимое)
+  if [ -d "$1" ]; then (cd "$1" && find . -type f | LC_ALL=C sort | while IFS= read -r f; do
+      printf '%s\n' "$f"; cat "$f"; done) | cksum
+  else cksum < "$1"; fi | cut -d' ' -f1
+}
 place() {  # place <источник> <цель>
-  # Бэкап, если на месте цели свой файл: в режиме COPY старая копия без правок не бэкапится.
-  if [ -e "$2" ] && [ ! -L "$2" ] && ! diff -rq "$1" "$2" >/dev/null 2>&1; then
-    mv "$2" "$2.bak-$STAMP"; echo "бэкап: $2.bak-$STAMP"
+  local rel="${2#$DST/}" cur
+  if [ -e "$2" ] && [ ! -L "$2" ]; then
+    cur=$(fp "$2")
+    # Бэкап только своего: не прошлая копия базы и не совпадает с новой.
+    if [ "$cur" != "$(fp "$1")" ] && ! grep -qxF "$rel	$cur" "$INSTALLED"; then
+      mkdir -p "$(dirname "$BACKUPS/$rel")"; mv "$2" "$BACKUPS/$rel"; echo "бэкап: $BACKUPS/$rel"
+    fi
   fi
   rm -rf "$2"
   if [ "${COPY:-0}" = 1 ]; then cp -R "$1" "$2"; else ln -s "$1" "$2"; fi
+  { grep -v "^$rel	" "$INSTALLED" || true; [ "${COPY:-0}" = 1 ] && printf '%s\t%s\n' "$rel" "$(fp "$2")"; } > "$INSTALLED.tmp"
+  mv "$INSTALLED.tmp" "$INSTALLED"
 }
+# Бэкапы прошлых версий установщика лежали рядом с навыками — убрать оттуда.
+for b in "$DST"/skills/*.bak-* "$DST"/agents/*.bak-* "$DST"/CLAUDE.md.bak-*; do
+  [ -e "$b" ] || continue
+  mkdir -p "$DST/claude-base-backups/old"; mv "$b" "$DST/claude-base-backups/old/"; echo "перенесён старый бэкап: $(basename "$b")"
+done
 
 place "$SRC/CLAUDE.md" "$DST/CLAUDE.md"
 rm -rf "$DST/base-hooks"   # хуки graphify из прошлых версий базы больше не нужны
