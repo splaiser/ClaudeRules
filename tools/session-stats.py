@@ -130,6 +130,7 @@ def report(r):
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")   # консоль Windows по умолчанию cp1251
     files = sys.argv[1:] or sorted(glob.glob(os.path.expanduser(
         os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"), "projects", "*", "*.jsonl"))),
         key=os.path.getmtime)[-10:]
