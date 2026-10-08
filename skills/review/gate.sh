@@ -15,7 +15,7 @@ BIG_LINES=400; BIG_FILES=15
 DOCS_RE='\.(md|mdx|txt|rst|adoc)$'   # спецификации (yaml, json, proto) — код, даже в docs/
 LOCK_RE='(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|poetry\.lock|uv\.lock|Pipfile\.lock|Cargo\.lock|go\.sum|composer\.lock|Gemfile\.lock)$'
 DEPS_RE='(^|/)(package\.json|pyproject\.toml|requirements[^/]*\.txt|Pipfile|go\.mod|Cargo\.toml|composer\.json|Gemfile|pom\.xml|build\.gradle(\.kts)?)$'
-RISK_RE='auth|login|session|passw|permission|acl|role|payment|billing|invoice|checkout|price|wallet|keypair|private[_-]?key|api[_-]?key|secret|crypt|signature|signer|migration|schema|\.sql$|\.(sol|move|cairo|fc|tact)$|(^|/)\.github/workflows/|dockerfile|docker-compose|deploy|\.env'
+RISK_RE='auth|login|(^|/)sessions?(/|\.)|passw|permission|acl|role|payment|billing|invoice|checkout|price|wallet|keypair|private[_-]?key|api[_-]?key|secret|crypt|signature|signer|migration|schema|\.sql$|\.(sol|move|cairo|fc|tact)$|(^|/)\.github/workflows/|dockerfile|docker-compose|deploy|\.env'
 
 set -euo pipefail
 mode=check; [ "${1:-}" = --hook ] && mode=hook
