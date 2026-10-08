@@ -138,7 +138,7 @@ def report(r):
     avg = ctx_total / r["calls"] if r["calls"] else 0
     print(f"средний контекст на вызов ≈{avg:,.0f} токенов — столько перечитывается при каждом ответе")
     if r["reads"]:
-        print(f"чтений файлов: {r['reads']}, из них повторных (тот же файл и диапазон, без правки между): "
+        print(f"чтений файлов: {r['reads']}, из них повторных (тот же файл и диапазон без правки между; верхняя оценка): "
               f"{r['rereads']} ({100 * r['rereads'] / r['reads']:.0f}%)")
     top = r["by_tool"].most_common(6)
     if top:
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")   # консоль Windows по умолчанию cp1251
     pattern = os.path.expanduser(os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"), "projects", "*", "*.jsonl"))
     if sys.argv[1:2] == ["--days"]:
-        since = datetime.now().timestamp() - float(sys.argv[2]) * 86400
+        since = datetime.now().timestamp() - float((sys.argv[2:3] or ["7"])[0]) * 86400
         summary([analyze(f) for f in glob.glob(pattern) if os.path.getmtime(f) >= since])
         sys.exit()
     files = sys.argv[1:] or sorted(glob.glob(pattern), key=os.path.getmtime)[-10:]

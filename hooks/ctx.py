@@ -2,7 +2,7 @@
 
 python ctx.py status   строка состояния (stdin — JSON строки состояния Claude Code)
 python ctx.py guard    хук UserPromptSubmit: остывший кеш + большой контекст → предупредить один раз
-python ctx.py start    хук SessionStart: после /clear подложить .claude/work/handoff.md
+python ctx.py start    хук SessionStart: после /clear подложить свежий .claude/work/handoff.md
 Данные только читаются; модель не вызывается. Любая ошибка — молча выйти, работу не ломать.
 """
 import json, os, sys, time
@@ -13,7 +13,8 @@ GUARD_PAUSE_MIN = 60         # TTL кеша подписки — 1 час
 GUARD_BYPASS_MIN = 10        # повторная отправка в течение этого времени проходит без проверки
 WARN_CTX = 300_000           # выше — сжатие базы должно было сработать
 HANDOFF = os.path.join(".claude", "work", "handoff.md")
-HANDOFF_FRESH_H = 24
+HANDOFF_FULL_H = 2       # /clear вскоре после /handoff — подложить файл целиком
+HANDOFF_FRESH_H = 24     # позже — только строку-указатель
 PRICE_IN = {"opus": 4.0, "sonnet": 2.0, "haiku": 1.0, "fable": 10.0}   # $/1M вход; запись в 1ч-кеш = 2×
 STATE = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"), "claude-base-state")
 
@@ -40,7 +41,8 @@ def last_turn(path):
         except ValueError:
             continue
         m = d.get("message") or {}
-        if d.get("type") == "assistant" and m.get("usage") and d.get("timestamp"):
+        if (d.get("type") == "assistant" and ctx_of(m.get("usage") or {}) and d.get("timestamp")
+                and not (m.get("model") or "").startswith("<")):   # <synthetic>: прерывание, ошибка API
             t = datetime.fromisoformat(d["timestamp"].replace("Z", "+00:00")).timestamp()
             return ctx_of(m["usage"]), t, m.get("model") or ""
     return 0, None, ""
@@ -119,8 +121,8 @@ def start(d):
     age_h = (time.time() - os.path.getmtime(path)) / 3600
     if age_h > HANDOFF_FRESH_H:
         return
-    text = open(path, encoding="utf-8", errors="ignore").read()[:6000]
-    if d["source"] == "clear":
+    text = open(path, encoding="utf-8", errors="ignore").read()[:3000]
+    if d["source"] == "clear" and age_h <= HANDOFF_FULL_H:
         msg = (f"Состояние задачи из прошлой сессии ({HANDOFF}, обновлён {age_h:.0f} ч назад). "
                f"Если пользователь начинает другую задачу — не используй.\n\n{text}")
     else:
