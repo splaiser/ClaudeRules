@@ -46,6 +46,7 @@ const fs = require("fs"), { BASE, OUT, MAN } = process.env;
 const read = f => fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : {};
 const base = read(BASE), cur = read(OUT), prev = read(MAN);  // prev — правила, добавленные базой в прошлый раз
 cur.env = { ...base.env, ...cur.env };                       // личные значения важнее базовых
+for (const k of ["autoCompactWindow"]) if (base[k] !== undefined && cur[k] === undefined) cur[k] = base[k];
 cur.permissions = cur.permissions || {};
 for (const k of ["allow", "ask", "deny"]) {
   const now = base.permissions[k] || [];
