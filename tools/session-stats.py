@@ -1,6 +1,7 @@
 """Куда уходят токены в сессиях Claude Code: разбор истории ~/.claude/projects/*/*.jsonl.
 
 python3 tools/session-stats.py [файл.jsonl ...]   без аргументов — 10 последних сессий
+python3 tools/session-stats.py --days 7            сводка по сессиям за 7 дней: строка на сессию и итог
 Данные только читаются; модель не вызывается.
 """
 import glob, json, os, re, sys
@@ -44,6 +45,7 @@ def analyze(path):
     calls, max_ctx, models, big = 0, 0, Counter(), []
     cost = ru_cost = rewrite_cost = 0.0
     rewrites, last_t = 0, None
+    reads, read_keys, rereads = 0, set(), 0   # повторное чтение: тот же файл и диапазон без правки между
     extra_now = 0.0          # переплата за русский, накопленная в контексте к текущему вызову, токенов
     per_char = 1 / RU_CPT - 1 / EN_CPT
     for line in open(path, encoding="utf-8"):
@@ -77,6 +79,19 @@ def analyze(path):
                 max_ctx = max(max_ctx, ctx)
                 calls += 1
                 models[m.get("model")] += 1
+        for b in (m.get("content") if d.get("type") == "assistant" and isinstance(m.get("content"), list) else []):
+            if b.get("type") != "tool_use" or b.get("id") in seen:
+                continue
+            seen.add(b.get("id"))
+            inp = b.get("input") or {}
+            fp = inp.get("file_path") or inp.get("notebook_path")
+            if b.get("name") == "Read" and fp:
+                reads += 1
+                key = (fp, inp.get("offset"), inp.get("limit"))
+                rereads += key in read_keys
+                read_keys.add(key)
+            elif fp:
+                read_keys = {r for r in read_keys if r[0] != fp}
         if d.get("type") in ("user", "assistant") and not d.get("isMeta"):
             role = "you" if d["type"] == "user" else "claude"
             for cat, t, tool in texts(m.get("content"), names):
@@ -93,7 +108,7 @@ def analyze(path):
                     ru_cost += n_cyr * per_char * po / 1e6           # и как выходные токены
                 if cat == "tool_result" and len(t) > 20000:
                     big.append(len(t))
-    return dict(rewrites=rewrites, rewrite_cost=rewrite_cost, by_tool=by_tool, path=path, calls=calls, usage=usage, cost=cost, ru_cost=ru_cost, max_ctx=max_ctx, models=models,
+    return dict(reads=reads, rereads=rereads, mtime=os.path.getmtime(path), rewrites=rewrites, rewrite_cost=rewrite_cost, by_tool=by_tool, path=path, calls=calls, usage=usage, cost=cost, ru_cost=ru_cost, max_ctx=max_ctx, models=models,
                 chars=chars, cyr=cyr, big=sorted(big, reverse=True)[:5])
 
 
@@ -122,6 +137,9 @@ def report(r):
               f"({100 * r['rewrite_cost'] / max(r['cost'], 1e-9):.0f}% стоимости)")
     avg = ctx_total / r["calls"] if r["calls"] else 0
     print(f"средний контекст на вызов ≈{avg:,.0f} токенов — столько перечитывается при каждом ответе")
+    if r["reads"]:
+        print(f"чтений файлов: {r['reads']}, из них повторных (тот же файл и диапазон, без правки между): "
+              f"{r['rereads']} ({100 * r['rereads'] / r['reads']:.0f}%)")
     top = r["by_tool"].most_common(6)
     if top:
         print("инструменты по объёму в истории (вызов + результат, символы):", ", ".join(f"{k} {v:,}" for k, v in top))
@@ -129,10 +147,29 @@ def report(r):
         print("самые большие выводы инструментов (символы):", ", ".join(f"{b:,}" for b in r["big"]))
 
 
+def summary(rs):
+    print(f"{'дата':11} {'проект':28} {'вызовов':>7} {'$':>8} {'ср.конт.':>9} {'макс':>6} {'паузы':>6} {'повт.чт':>7}")
+    tot = Counter()
+    for r in sorted(rs, key=lambda r: r["mtime"]):
+        u = r["usage"]
+        ctx = u["input_tokens"] + u["cache_creation_input_tokens"] + u["cache_read_input_tokens"]
+        proj = os.path.basename(os.path.dirname(r["path"]))[-28:]
+        print(f"{datetime.fromtimestamp(r['mtime']):%m-%d %H:%M} {proj:28} {r['calls']:>7} {r['cost']:>8.2f} "
+              f"{ctx / max(r['calls'], 1) / 1e3:>8.0f}k {r['max_ctx'] / 1e3:>5.0f}k "
+              f"{100 * r['rewrite_cost'] / max(r['cost'], 1e-9):>5.0f}% {100 * r['rereads'] / max(r['reads'], 1):>6.0f}%")
+        tot.update(calls=r["calls"], cost=r["cost"], rw=r["rewrite_cost"], ctx=ctx, big=r["max_ctx"] > 300_000)
+    print(f"итого: сессий {len(rs)}, вызовов {tot['calls']}, ≈${tot['cost']:.2f} по ценам API, средний контекст "
+          f"{tot['ctx'] / max(tot['calls'], 1) / 1e3:.0f}k, перезапись после пауз {100 * tot['rw'] / max(tot['cost'], 1e-9):.0f}%, "
+          f"сессий с контекстом больше 300k: {tot['big']}")
+
+
 if __name__ == "__main__":
     sys.stdout.reconfigure(encoding="utf-8")   # консоль Windows по умолчанию cp1251
-    files = sys.argv[1:] or sorted(glob.glob(os.path.expanduser(
-        os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"), "projects", "*", "*.jsonl"))),
-        key=os.path.getmtime)[-10:]
+    pattern = os.path.expanduser(os.path.join(os.environ.get("CLAUDE_CONFIG_DIR", "~/.claude"), "projects", "*", "*.jsonl"))
+    if sys.argv[1:2] == ["--days"]:
+        since = datetime.now().timestamp() - float(sys.argv[2]) * 86400
+        summary([analyze(f) for f in glob.glob(pattern) if os.path.getmtime(f) >= since])
+        sys.exit()
+    files = sys.argv[1:] or sorted(glob.glob(pattern), key=os.path.getmtime)[-10:]
     for f in files:
         report(analyze(f))

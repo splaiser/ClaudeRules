@@ -67,7 +67,7 @@ const fs = require("fs"), { BASE, OUT, MAN } = process.env;
 const read = f => fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : {};
 const base = read(BASE), cur = read(OUT), prev = read(MAN);  // prev — правила, добавленные базой в прошлый раз
 cur.env = { ...base.env, ...cur.env };                       // личные значения важнее базовых
-for (const k of ["autoCompactWindow"]) if (base[k] !== undefined && cur[k] === undefined) cur[k] = base[k];
+for (const k of ["autoCompactWindow", "statusLine"]) if (base[k] !== undefined && cur[k] === undefined) cur[k] = base[k];
 cur.permissions = cur.permissions || {};
 for (const k of ["allow", "ask", "deny"]) {
   const now = base.permissions[k] || [];
@@ -91,7 +91,7 @@ E = os.environ
 read = lambda f: json.load(open(f, encoding="utf-8")) if os.path.exists(f) else {}
 base, cur, prev = read(E["BASE"]), read(E["OUT"]), read(E["MAN"])
 cur["env"] = {**base.get("env", {}), **cur.get("env", {})}
-for k in ["autoCompactWindow"]:
+for k in ["autoCompactWindow", "statusLine"]:
     if k in base and k not in cur: cur[k] = base[k]
 perms = cur.setdefault("permissions", {})
 for k in ["allow", "ask", "deny"]:
