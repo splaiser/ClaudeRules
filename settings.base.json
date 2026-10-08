@@ -32,5 +32,18 @@
       "Read(~/.foundry/keystores/**)",
       "Read(~/.ethereum/keystore/**)"
     ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "bash \"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/claude-base-hooks/stop-review.sh\""
+          }
+        ]
+      }
+    ]
   }
 }

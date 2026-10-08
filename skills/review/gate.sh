@@ -6,17 +6,21 @@
 #   gate.sh --start            точка отсчёта задачи, если истории ревью в ветке ещё нет
 #   gate.sh --mark ok|findings после ответа reviewer: проверенный снимок становится базой
 #   gate.sh --reset            забыть историю ревью ветки
+#   gate.sh --hook             для хука Stop: ничего не меняет, печатает причину, только если нужно ревью
+#                              и напоминания для этого состояния кода ещё не было
 # Пороги и зоны риска — эвристика, правь под себя.
 SKIP_LINES=20   # без ревью: значимых строк (добавленные + удалённые) не больше SKIP_LINES,
 SKIP_FILES=1    # файлов кода не больше SKIP_FILES и ничего из зон риска
 BIG_LINES=400; BIG_FILES=15
-DOCS_RE='(\.(md|mdx|txt|rst|adoc)$|(^|/)docs/)'
+DOCS_RE='\.(md|mdx|txt|rst|adoc)$'   # спецификации (yaml, json, proto) — код, даже в docs/
 LOCK_RE='(^|/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|bun\.lockb?|poetry\.lock|uv\.lock|Pipfile\.lock|Cargo\.lock|go\.sum|composer\.lock|Gemfile\.lock)$'
 DEPS_RE='(^|/)(package\.json|pyproject\.toml|requirements[^/]*\.txt|Pipfile|go\.mod|Cargo\.toml|composer\.json|Gemfile|pom\.xml|build\.gradle(\.kts)?)$'
 RISK_RE='auth|login|session|passw|permission|acl|role|payment|billing|invoice|checkout|price|wallet|keypair|private[_-]?key|api[_-]?key|secret|crypt|signature|signer|migration|schema|\.sql$|\.(sol|move|cairo|fc|tact)$|(^|/)\.github/workflows/|dockerfile|docker-compose|deploy|\.env'
 
 set -euo pipefail
+mode=check; [ "${1:-}" = --hook ] && mode=hook
 root=$(git rev-parse --show-toplevel 2>/dev/null) || {
+  [ "$mode" = hook ] && exit 0
   echo "verdict: run"; echo "reason: не git-репозиторий — дельту посчитать нельзя"; exit 0; }
 cd "$root"
 gitdir=$(git rev-parse --absolute-git-dir)
@@ -58,21 +62,30 @@ case "${1:-}" in
            printf '%s\t%s\t%s\t%s\t%s\n' "$(date +%F)" "$project" "$branch" "$(get stats)" "$res" >> "$log"
            echo "отмечено как проверенное: ${cur:0:12}"; exit 0 ;;
   --base)  base=$(git rev-parse "${2:?укажи базу}^{tree}") ;;
-  "")      base=$(get reviewed); exists "$base" || base=$(default_base) ;;
+  ""|--hook) base=$(get reviewed); exists "$base" || base=$(default_base) ;;
   *)       echo "неизвестный аргумент: $1" >&2; exit 2 ;;
 esac
 
-cur=$(snapshot); put pending "$cur"
+cur=$(snapshot)
 out() { echo "verdict: $1"; echo "reason: $2"; echo "base: $base"; echo "current: $cur"
   echo "diff: git diff $base $cur"; [ -z "$stats" ] || echo "stats: $stats"
   [ -z "$focus" ] || echo "focus: $focus"; }
+finish() {  # $1 — verdict, $2 — reason
+  if [ "$mode" = hook ]; then
+    [ "$1" = run ] && [ "$(get nagged)" != "$cur" ] && { put nagged "$cur"; echo "$2${focus:+; зоны риска: $focus}"; }
+    exit 0
+  fi
+  put pending "$cur"; [ -z "$stats" ] || put stats "$stats risk=$([ -n "$focus" ] && echo yes || echo no)"
+  out "$1" "$2"; exit 0
+}
 stats=""; focus=""
-[ "$base" = "$cur" ] && { out skip "нет изменений с прошлого ревью"; exit 0; }
+[ "$base" = "$cur" ] && finish skip "нет изменений с прошлого ревью"
 
 code_files=0; code_lines=0; other=0; deps=no; all_files=0
 while IFS=$'\t' read -r a d path; do
   all_files=$((all_files + 1))
-  if printf '%s' "$path" | grep -qiE "$DOCS_RE|$LOCK_RE"; then other=$((other + 1)); continue; fi
+  if [ "$a" = - ] || printf '%s' "$path" | grep -qiE "$DOCS_RE|$LOCK_RE"; then   # двоичное ревьюить нечем
+    other=$((other + 1)); continue; fi
   printf '%s' "$path" | grep -qE "$DEPS_RE" && deps=yes
   printf '%s' "$path" | grep -qiE "$RISK_RE" && focus="${focus:+$focus, }$path"
   code_files=$((code_files + 1))
@@ -89,12 +102,11 @@ done < <(git diff --no-renames --numstat -w --ignore-blank-lines "$base" "$cur")
 size=normal
 { [ "$sig_lines" -ge "$BIG_LINES" ] || [ "$code_files" -ge "$BIG_FILES" ]; } && size=big
 stats="code_files=$code_files code_lines=$sig_lines raw_lines=$code_lines other_files=$other deps=$deps size=$size"
-put stats "$stats risk=$([ -n "$focus" ] && echo yes || echo no)"
 
-if [ "$code_files" -eq 0 ]; then out skip "только документация и lock-файлы"
-elif [ "$sig_lines" -eq 0 ] && [ -z "$focus" ]; then out skip "только пробелы и пустые строки"
-elif [ -n "$focus" ]; then out run "затронуты зоны риска"
-elif [ "$deps" = yes ]; then out run "изменены зависимости"
+if [ "$code_files" -eq 0 ]; then finish skip "только документация, lock- и двоичные файлы"
+elif [ "$sig_lines" -eq 0 ] && [ -z "$focus" ]; then finish skip "только пробелы и пустые строки"
+elif [ -n "$focus" ]; then finish run "затронуты зоны риска"
+elif [ "$deps" = yes ]; then finish run "изменены зависимости"
 elif [ "$sig_lines" -le "$SKIP_LINES" ] && [ "$code_files" -le "$SKIP_FILES" ]; then
-  out skip "мелкая правка: строк $sig_lines, файлов $code_files — копится до следующего ревью"
-else out run "значимых строк $sig_lines, файлов $code_files"; fi
+  finish skip "мелкая правка: строк $sig_lines, файлов $code_files — копится до следующего ревью"
+else finish run "значимых строк $sig_lines, файлов $code_files"; fi

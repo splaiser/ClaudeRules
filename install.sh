@@ -18,6 +18,7 @@ place() {  # place <источник> <цель>
 
 place "$SRC/CLAUDE.md" "$DST/CLAUDE.md"
 rm -rf "$DST/base-hooks"   # хуки graphify из прошлых версий базы больше не нужны
+place "$SRC/hooks" "$DST/claude-base-hooks"
 for d in "$SRC"/skills/*/; do place "${d%/}" "$DST/skills/$(basename "$d")"; done
 for f in "$SRC"/agents/*.md; do place "$f" "$DST/agents/$(basename "$f")"; done
 for l in "$DST"/skills/* "$DST"/agents/*; do   # симлинки на удалённые из базы файлы
@@ -53,10 +54,12 @@ for (const k of ["allow", "ask", "deny"]) {
   if (!cur.permissions[k].length) delete cur.permissions[k];
 }
 fs.writeFileSync(MAN, JSON.stringify(base.permissions, null, 2) + "\n");
-for (const ev of Object.keys(cur.hooks || {})) {             // убрать хуки прошлых версий базы
+for (const ev of Object.keys(cur.hooks || {})) {             // убрать хуки базы (прошлых версий и текущей)
   cur.hooks[ev] = cur.hooks[ev].filter(g => !JSON.stringify(g).includes("base-hooks"));
   if (!cur.hooks[ev].length) delete cur.hooks[ev];
 }
+for (const [ev, groups] of Object.entries(base.hooks || {}))  // и поставить текущие
+  (cur.hooks = cur.hooks || {})[ev] = [...(cur.hooks[ev] || []), ...groups];
 if (cur.hooks && !Object.keys(cur.hooks).length) delete cur.hooks;
 fs.writeFileSync(OUT, JSON.stringify(cur, null, 2) + "\n");
 '
