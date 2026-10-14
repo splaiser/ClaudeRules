@@ -43,7 +43,9 @@
   Как этим пользоваться — `TOKENS.md`.
 - `skills/economy` и `hooks/economy.sh` — выключатель: `/economy status`, `/economy off`,
   `/economy off guard --project`, `/economy on`. Компоненты: `guard`, `status`,
-  `handoff`, `review`; для всех проектов или для одного. Действует сразу.
+  `handoff`, `review`, `compact`. Для всех проектов выключение убирает компонент из
+  `settings.json` и обновления его не возвращают (уступить место другому инструменту);
+  `--project` — хуки молчат в одном проекте. `hooks/merge-settings.sh` — слияние настроек.
 - `hooks/stop-review.sh` — хук Stop: напоминает о ревью, если гейт видит непроверенные
   изменения выше порога. Ставится в `~/.claude/claude-base-hooks/`. Все хуки
   разом выключает и переменная окружения `CLAUDE_BASE_HOOKS=off`.
