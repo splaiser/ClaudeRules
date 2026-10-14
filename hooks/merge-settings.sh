@@ -2,11 +2,11 @@
 # Слияние settings.base.json с ~/.claude/settings.json: Claude Code сам пишет в этот файл, поэтому не замена.
 # Компоненты, выключенные через economy.sh (файлы в claude-base-state/off/), в settings.json не попадают
 # и убираются оттуда. Слияние — node или python; без них, если settings.json ещё нет, кладётся готовый файл базы.
-# Вызывается из install.sh и economy.sh. Среда: BASE (по умолчанию — копия в claude-base-state), CLAUDE_CONFIG_DIR.
+# Вызывается из install.sh (он кладёт копию settings.base.json в claude-base-state) и из economy.sh.
 set -euo pipefail
 DST="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
 STATE="$DST/claude-base-state"
-export BASE="${BASE:-$STATE/settings.base.json}" OUT="$DST/settings.json" MAN="$DST/claude-base.permissions.json"
+export BASE="$STATE/settings.base.json" OUT="$DST/settings.json" MAN="$DST/claude-base.permissions.json"
 export NEW="$OUT.new"
 SKIP=""; for c in guard status handoff review compact; do [ -e "$STATE/off/$c" ] && SKIP="$SKIP $c"; done; export SKIP
 [ -f "$BASE" ] || { echo "нет $BASE — запустите update-claude.sh"; exit 1; }

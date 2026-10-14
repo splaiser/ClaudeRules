@@ -40,6 +40,7 @@ case "$cmd" in
     done ;;
   off|on)
     if [ $project = 1 ]; then
+      [ ${#names[@]} -gt 0 ] || exit 0
       mkdir -p "$PWD/.claude"; touch "$pf"
       for c in "${names[@]}"; do
         tr -d '\r' < "$pf" | grep -vxF "$c" > "$pf.tmp"; mv "$pf.tmp" "$pf"
@@ -47,7 +48,7 @@ case "$cmd" in
       done
       [ -s "$pf" ] || rm -f "$pf"
       if [ -f "$pf" ] && ex=$(git rev-parse --git-path info/exclude 2>/dev/null); then   # локально, в коммиты не попадает
-        grep -qxF ".claude/claude-base-off" "$ex" 2>/dev/null || { mkdir -p "$(dirname "$ex")"; echo ".claude/claude-base-off" >> "$ex"; }
+        grep -qxF "claude-base-off" "$ex" 2>/dev/null || { mkdir -p "$(dirname "$ex")"; echo "claude-base-off" >> "$ex"; }
       fi
     else
       mkdir -p "$BASE_OFF_DIR"
