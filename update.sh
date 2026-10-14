@@ -25,6 +25,8 @@ for T in "${TARGETS[@]}"; do
   done
   [ -e "$T/claude-base-hooks/stop-review.sh" ] && ok "скрипт хука ревью" || bad "скрипт хука ревью"
   [ -e "$T/skills/handoff/SKILL.md" ] && ok "навык handoff" || bad "навык handoff"
+  [ -e "$T/skills/economy/SKILL.md" ] && [ -e "$T/claude-base-hooks/economy.sh" ] && [ -e "$T/claude-base-hooks/off.sh" ] \
+    && ok "выключатель /economy" || bad "выключатель /economy"
   PYOK=; for c in python3 python py; do
     "$c" -c "" >/dev/null 2>&1 && { PYOK=1; break; }; done
   [ -n "${PYOK:-}" ] && ok "Python для хуков контекста" || bad "Python для хуков контекста (страж паузы и строка состояния без него молчат)"
@@ -41,7 +43,7 @@ done
 echo
 if [ "$FAIL" = 0 ]; then
   echo "Готово. Полностью закройте и заново откройте Claude Code, затем проверьте:"
-  echo "  /rules-review и /handoff есть в подсказках, /context показывает «/ 300k», внизу строка «контекст … · кеш …»"
+  echo "  /rules-review, /handoff и /economy есть в подсказках, /context показывает «/ 300k», внизу строка «контекст … · кеш …»"
   echo "Как работать экономно: ~/claude-base/TOKENS.md"
 else
   echo "Есть строки «НЕТ» — пришлите весь вывод."

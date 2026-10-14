@@ -12,7 +12,8 @@
       "Bash(git diff*)",
       "Bash(git log*)",
       "Bash(bash ~/.claude/skills/review/gate.sh*)",
-      "Bash(bash ~/.claude/skills/rules-review/lesson.sh*)"
+      "Bash(bash ~/.claude/skills/rules-review/lesson.sh*)",
+      "Bash(bash ~/.claude/claude-base-hooks/economy.sh*)"
     ],
     "ask": [
       "Read(.env)",
@@ -59,7 +60,7 @@
     ],
     "SessionStart": [
       {
-        "matcher": "clear|startup",
+        "matcher": "startup|clear|resume|compact",
         "hooks": [
           {
             "type": "command",

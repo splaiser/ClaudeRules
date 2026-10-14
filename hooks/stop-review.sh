@@ -1,8 +1,8 @@
 #!/bin/bash
 # Хук Stop: напомнить о ревью, если с прошлого ревью накопились изменения выше порога гейта.
 # Одно напоминание на состояние кода; сообщение мягкое (additionalContext), остановку не ломает.
-# Выключить: переменная окружения CLAUDE_BASE_HOOKS=off.
-[ "${CLAUDE_BASE_HOOKS:-on}" = off ] && exit 0
+# Выключить: economy.sh off review (или /economy), либо CLAUDE_BASE_HOOKS=off.
+. "$(dirname "$0")/off.sh"; base_off review && exit 0
 input=$(cat)
 printf '%s' "$input" | grep -qE '"stop_hook_active" *: *true' && exit 0   # уже продолжаем по хуку
 

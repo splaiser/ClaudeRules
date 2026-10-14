@@ -2,7 +2,7 @@
 
 python ctx.py status   строка состояния (stdin — JSON строки состояния Claude Code)
 python ctx.py guard    хук UserPromptSubmit: остывший кеш + большой контекст → предупредить один раз
-python ctx.py start    хук SessionStart: после /clear подложить свежий .claude/work/handoff.md
+python ctx.py start    хук SessionStart: подсказка про /clear и свежий .claude/work/handoff.md
 Данные только читаются; модель не вызывается. Любая ошибка — молча выйти, работу не ломать.
 """
 import json, os, sys, time
@@ -13,6 +13,9 @@ GUARD_PAUSE_MIN = 60         # TTL кеша подписки — 1 час
 GUARD_BYPASS_MIN = 10        # повторная отправка в течение этого времени проходит без проверки
 WARN_CTX = 300_000           # выше — сжатие базы должно было сработать
 HANDOFF = os.path.join(".claude", "work", "handoff.md")
+HINT = ("Экономия токенов: контекст прошлой задачи оплачивается в каждом шаге новой. Когда задача закрыта, а следующая "
+        "с ней не связана, одной строкой предложи пользователю /clear. Если впереди перерыв или много шагов — "
+        "/handoff, затем /clear. Выключается командой /economy.")
 HANDOFF_FULL_H = 2       # /clear вскоре после /handoff — подложить файл целиком
 HANDOFF_FRESH_H = 24     # позже — только строку-указатель
 PRICE_IN = {"opus": 4.0, "sonnet": 2.0, "haiku": 1.0, "fable": 10.0}   # $/1M вход; запись в 1ч-кеш = 2×
@@ -115,21 +118,26 @@ def guard(d):
 
 
 def start(d):
+    parts = [HINT]
     path = os.path.join(d.get("cwd") or os.getcwd(), HANDOFF)
-    if d.get("source") not in ("clear", "startup") or not os.path.isfile(path):
-        return
+    if d.get("source") in ("clear", "startup") and os.path.isfile(path):
+        parts.append(handoff_note(d["source"], path))
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart",
+                                             "additionalContext": "\n\n".join(p for p in parts if p)}}, ensure_ascii=False))
+
+
+def handoff_note(source, path):
     age_h = (time.time() - os.path.getmtime(path)) / 3600
     if age_h > HANDOFF_FRESH_H:
-        return
+        return ""
     text = open(path, encoding="utf-8", errors="ignore").read()[:3000]
-    if d["source"] == "clear" and age_h <= HANDOFF_FULL_H:
+    if source == "clear" and age_h <= HANDOFF_FULL_H:
         msg = (f"Состояние задачи из прошлой сессии ({HANDOFF}, обновлён {age_h:.0f} ч назад). "
                f"Если пользователь начинает другую задачу — не используй.\n\n{text}")
     else:
         first = next((l.strip("# ").strip() for l in text.splitlines() if l.strip()), "")
         msg = f"Есть {HANDOFF} ({age_h:.0f} ч назад): «{first[:150]}». Прочитай, если пользователь продолжает эту задачу."
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "SessionStart", "additionalContext": msg}},
-                     ensure_ascii=False))
+    return msg
 
 
 if __name__ == "__main__":

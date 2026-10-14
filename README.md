@@ -41,9 +41,12 @@
   страж паузы (сообщение в остывшую большую сессию не уходит с первого раза) и
   подхват handoff. Нужен Python; строка состояния ставится, только если своей нет.
   Как этим пользоваться — `TOKENS.md`.
+- `skills/economy` и `hooks/economy.sh` — выключатель: `/economy status`, `/economy off`,
+  `/economy off guard --project`, `/economy on`. Компоненты: `guard`, `status`,
+  `handoff`, `review`; для всех проектов или для одного. Действует сразу.
 - `hooks/stop-review.sh` — хук Stop: напоминает о ревью, если гейт видит непроверенные
-  изменения выше порога. Ставится в `~/.claude/claude-base-hooks/`, выключается
-  переменной окружения `CLAUDE_BASE_HOOKS=off`.
+  изменения выше порога. Ставится в `~/.claude/claude-base-hooks/`. Все хуки
+  разом выключает и переменная окружения `CLAUDE_BASE_HOOKS=off`.
 - `settings.base.json` — разрешения (`allow`, `ask`, `deny`); сливается с
   `~/.claude/settings.json`. Правило, убранное из базы, установщик убирает и оттуда
   (список добавленного — `~/.claude/claude-base.permissions.json`).
